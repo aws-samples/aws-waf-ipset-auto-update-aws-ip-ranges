@@ -1,0 +1,9 @@
+*.DS_Store
+__pycache__/
+*.zip
+.vscode
+internal/*
+*.bak
+_*.*
+auto-update_wafv2_ipset.zip
+lambda_return.json

@@ -1,0 +1,152 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: Creates two regional WAFv2 IP sets that are automatically updated with AWS service's IP ranges.
+
+Parameters:
+  LambdaCodeS3Bucket:
+    Type: String
+    Description: The S3 bucket where the Lambda function's packaged code is stored.
+  LambdaCodeS3Object:
+    Type: String
+    Description: The S3 object name of Lambda function's packaged code.
+  IPV4SetNameSuffix: 
+    Type: String
+    Default: IPv4Set
+    Description: The WAFv2 IPv4 set suffix. The prefix will be the stack name. The IP set is initially created with a bogus address
+  IPV6SetNameSuffix: 
+    Type: String
+    Default: IPv6Set
+    Description: The WAFv2 IPv6 set suffix. The prefix will be the stack name. The IP set is initially created with a bogus address
+  SERVICES:
+    Type: String
+    Default: ROUTE53_HEALTHCHECKS,CLOUDFRONT
+    Description: Enter the name of the AWS services to add, separated by commas and as explained in https://docs.aws.amazon.com/general/latest/gr/aws-ip-ranges.html
+  EC2REGIONS:
+    Type: String
+    Default: 'all'
+    Description: For the "EC2" service, specify the AWS regions to add, separated by commas. Use 'all' to add all AWS regions.
+
+Resources:
+  IPv4Set:
+    Type: AWS::WAFv2::IPSet
+    Properties: 
+      Addresses: 
+        - 192.0.2.0/24
+      Description: IPv4 set automatically updated with AWS IP ranges
+      IPAddressVersion: IPV4
+      Name: !Sub
+        - ${AWS::StackName}-${Suffix}
+        - {Suffix: !Ref IPV4SetNameSuffix}
+      Scope: REGIONAL
+
+  IPv6Set:
+    Type: AWS::WAFv2::IPSet
+    Properties: 
+      Addresses: 
+        - 2001:DB8::/32
+      Description: IPv6 set automatically updated with AWS IP ranges
+      IPAddressVersion: IPV6
+      Name: !Sub
+        - ${AWS::StackName}-${Suffix}
+        - {Suffix: !Ref IPV6SetNameSuffix}
+      Scope: REGIONAL
+
+  LambdaUpdateWAFv2IPSet:
+    Type: AWS::Lambda::Function
+    Properties: 
+      Description: This Lambda function, invoked by an incoming SNS message, updates the IPv4 and IPv6 sets with the addresses from the specified services
+      Environment: 
+        Variables:
+          IPV4_SET_NAME:
+            !Select 
+              - "0"
+              - !Split [ "|" , Ref: IPv4Set]
+          IPV4_SET_ID:
+            Fn::GetAtt: [ IPv4Set, Id ]
+          IPV6_SET_NAME:
+            !Select 
+              - "0"
+              - !Split [ "|" , Ref: IPv6Set]
+          IPV6_SET_ID:
+            Fn::GetAtt: [ IPv6Set, Id ]
+          SERVICES:
+            Ref: SERVICES
+          EC2_REGIONS:
+            Ref: EC2REGIONS
+          INFO_LOGGING: "false"
+
+      FunctionName: !Sub '${AWS::StackName}-UpdateWAFIPSets'
+      Handler: update_wafv2_ipset.lambda_handler
+      MemorySize: 128
+      Role:
+        Fn::GetAtt: [ LambdaUpdateWAFv2IPSetIamRole, Arn ]
+      Runtime: python3.8
+      Timeout: 10
+      Code: 
+        S3Bucket:
+          Ref: LambdaCodeS3Bucket
+        S3Key:
+          Ref: LambdaCodeS3Object
+
+  LambdaUpdateWAFv2IPSetIamRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement: 
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Description: Lambda execution role
+      Path: /service-role/
+
+  LambdaUpdateWAFv2IPSetIamPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub '${AWS::StackName}-LambdaUpdateWAFv2IPSetIamPolicy'
+      Roles:
+        - Ref: LambdaUpdateWAFv2IPSetIamRole
+      PolicyDocument: |
+        {
+            "Version": "2012-10-17",
+            "Statement": [{
+                    "Sid": "CloudWatchLogsPermissions",
+                    "Effect": "Allow",
+                    "Action": [
+                        "logs:CreateLogGroup",
+                        "logs:CreateLogStream",
+                        "logs:PutLogEvents"
+                    ],
+                    "Resource": "arn:aws:logs:*:*:*"
+                }, {
+                        "Sid": "WAFPermissions",
+                        "Effect": "Allow",
+                        "Action": [
+                            "wafv2:UpdateIPSet",
+                            "wafv2:GetIPSet"
+                        ],
+                        "Resource": "*"
+                    }
+            ]
+        }
+
+  LambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties: 
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt: [ LambdaUpdateWAFv2IPSet, Arn ]
+      Principal: sns.amazonaws.com
+      SourceArn: arn:aws:sns:us-east-1:806199016981:AmazonIpSpaceChanged
+
+  LambdaSNSSubscription:
+    Type: AWS::SNS::Subscription
+    Properties: 
+      Endpoint:
+        Fn::GetAtt: [ LambdaUpdateWAFv2IPSet, Arn ]
+      Protocol: lambda
+      Region: us-east-1
+      TopicArn: arn:aws:sns:us-east-1:806199016981:AmazonIpSpaceChanged
