@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT-0
 
 AWSTemplateFormatVersion: 2010-09-09
-Description: Creates two regional WAFv2 IP sets that are automatically updated with AWS service's IP ranges.
+Description: Creates two regional AWS WAF IP sets that are automatically updated with AWS service's IP ranges.
 
 Parameters:
   LambdaCodeS3Bucket:
@@ -14,11 +14,11 @@ Parameters:
   IPV4SetNameSuffix: 
     Type: String
     Default: IPv4Set
-    Description: The WAFv2 IPv4 set suffix. The prefix will be the stack name. The IP set is initially created with a bogus address
+    Description: The AWS WAF IPv4 set suffix. The prefix will be the stack name. The IP set is initially created with a bogus address
   IPV6SetNameSuffix: 
     Type: String
     Default: IPv6Set
-    Description: The WAFv2 IPv6 set suffix. The prefix will be the stack name. The IP set is initially created with a bogus address
+    Description: The AWS WAF IPv6 set suffix. The prefix will be the stack name. The IP set is initially created with a bogus address
   SERVICES:
     Type: String
     Default: ROUTE53_HEALTHCHECKS,CLOUDFRONT
@@ -53,7 +53,7 @@ Resources:
         - {Suffix: !Ref IPV6SetNameSuffix}
       Scope: REGIONAL
 
-  LambdaUpdateWAFv2IPSet:
+  LambdaUpdateWAFIPSet:
     Type: AWS::Lambda::Function
     Properties: 
       Description: This Lambda function, invoked by an incoming SNS message, updates the IPv4 and IPv6 sets with the addresses from the specified services
@@ -78,10 +78,10 @@ Resources:
           INFO_LOGGING: "false"
 
       FunctionName: !Sub '${AWS::StackName}-UpdateWAFIPSets'
-      Handler: update_wafv2_ipset.lambda_handler
+      Handler: update_aws_waf_ipset.lambda_handler
       MemorySize: 128
       Role:
-        Fn::GetAtt: [ LambdaUpdateWAFv2IPSetIamRole, Arn ]
+        Fn::GetAtt: [ LambdaUpdateWAFIPSetIamRole, Arn ]
       Runtime: python3.8
       Timeout: 10
       Code: 
@@ -90,7 +90,7 @@ Resources:
         S3Key:
           Ref: LambdaCodeS3Object
 
-  LambdaUpdateWAFv2IPSetIamRole:
+  LambdaUpdateWAFIPSetIamRole:
     Type: AWS::IAM::Role
     Properties: 
       AssumeRolePolicyDocument:
@@ -103,12 +103,12 @@ Resources:
       Description: Lambda execution role
       Path: /service-role/
 
-  LambdaUpdateWAFv2IPSetIamPolicy:
+  LambdaUpdateWAFIPSetIamPolicy:
     Type: AWS::IAM::Policy
     Properties:
-      PolicyName: !Sub '${AWS::StackName}-LambdaUpdateWAFv2IPSetIamPolicy'
+      PolicyName: !Sub '${AWS::StackName}-LambdaUpdateWAFIPSetIamPolicy'
       Roles:
-        - Ref: LambdaUpdateWAFv2IPSetIamRole
+        - Ref: LambdaUpdateWAFIPSetIamRole
       PolicyDocument: |
         {
             "Version": "2012-10-17",
@@ -138,7 +138,7 @@ Resources:
     Properties: 
       Action: lambda:InvokeFunction
       FunctionName:
-        Fn::GetAtt: [ LambdaUpdateWAFv2IPSet, Arn ]
+        Fn::GetAtt: [ LambdaUpdateWAFIPSet, Arn ]
       Principal: sns.amazonaws.com
       SourceArn: arn:aws:sns:us-east-1:806199016981:AmazonIpSpaceChanged
 
@@ -146,7 +146,7 @@ Resources:
     Type: AWS::SNS::Subscription
     Properties: 
       Endpoint:
-        Fn::GetAtt: [ LambdaUpdateWAFv2IPSet, Arn ]
+        Fn::GetAtt: [ LambdaUpdateWAFIPSet, Arn ]
       Protocol: lambda
       Region: us-east-1
       TopicArn: arn:aws:sns:us-east-1:806199016981:AmazonIpSpaceChanged

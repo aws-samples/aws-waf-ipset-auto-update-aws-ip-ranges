@@ -1,20 +1,20 @@
-## Automatically update WAF IP sets with AWS IP Ranges
+## Automatically update AWS WAF IP sets with AWS IP Ranges
 
-This project creates two regional WAFv2 IP sets and automatically updates them with AWS service's IP ranges from the [ip-ranges.json](https://docs.aws.amazon.com/general/latest/gr/aws-ip-ranges.html) file. The ranges are configurable as well as the regions for EC2 ranges. Use cases include allowing CloudFront requests, Route53 health checker and EC2 IP range (which includes AWS Lambda and CloudWatch Synthetics). The IP sets are created in the region where the CloudFormation stack is created and the IP addresses in the IP sets are completely replaced on every update.
+This project creates two regional AWS WAF IP sets and automatically updates them with AWS service's IP ranges from the [ip-ranges.json](https://docs.aws.amazon.com/general/latest/gr/aws-ip-ranges.html) file. The ranges are configurable as well as the regions for EC2 ranges. Use cases include allowing CloudFront requests, Route53 health checker and EC2 IP range (which includes AWS Lambda and CloudWatch Synthetics). The IP sets are created in the region where the CloudFormation stack is created and the IP addresses in the IP sets are completely replaced on every update.
 
 ## Overview
 
 The CloudFormation template `cloudformation/template.yml` creates a stack with the following resources:
 
-1. Two WAFv2 IP sets. One for IPv4 addresses and one for IPv6 addresses.
-1. AWS Lambda function with customizable environment variables. The function's code is in `lambda/update_wafv2_ipset.py` and is written in Python.
+1. Two AWS WAF IP sets. One for IPv4 addresses and one for IPv6 addresses.
+1. AWS Lambda function with customizable environment variables. The function's code is in `lambda/update_aws_waf_ipset.py` and is written in Python.
 1. Lambda function's execution role.
 1. SNS subscription and Lambda invocation permissions for the `arn:aws:sns:us-east-1:806199016981:AmazonIpSpaceChanged` SNS topic.
 
 ```
                           +-----------------+         +----------------+
                           | Lambda          |         |                |
-                          | Execution Role  |    +--->+ WAFv2 IPv4 Set |
+                          | Execution Role  |    +--->+AWS WAF IPv4 Set|
                           +--------+--------+    |    |                |
                                    |             |    +----------------+
                                    |             |
@@ -23,7 +23,7 @@ The CloudFormation template `cloudformation/template.yml` creates a stack with t
 |AmazonIpSpaceChanged|    +--------+--------+    |
 +--------------------+             |             |    +----------------+
                                    |             |    |                |
-                                   v             +--->+ WAFv2 IPv6 Set |
+                                   v             +--->+AWS WAF IPv6 Set|
                           +--------+--------+         |                |
                           | CloudWatch Logs |         +----------------+
                           +-----------------+
@@ -47,7 +47,7 @@ To simplify setup and deployment, assign the values to the following variables. 
 REGION=<region>
 CFN_STACK_NAME=<Stack name>
 BUCKET_NAME=<bucket name>
-OBJECT_NAME=auto-update_wafv2_ipset.zip
+OBJECT_NAME=auto-update_aws_waf_ipset.zip
 ```
 
 ### 1. Create an S3 bucket
@@ -77,8 +77,8 @@ aws s3api create-bucket \
 Run the following commands from the **repository root**:
 
 ```bash
-cp lambda/update_wafv2_ipset.py .
-zip $OBJECT_NAME update_wafv2_ipset.py
+cp lambda/update_aws_waf_ipset.py .
+zip $OBJECT_NAME update_aws_waf_ipset.py
 ```
 
 ### 3. Upload the packaged code to S3
@@ -93,8 +93,8 @@ The CloudFormation template has the following input parameters.
 
 * `LambdaCodeS3Bucket`: The S3 bucket where the Lambda function's packaged code is stored.
 * `LambdaCodeS3Object`: The S3 object name of Lambda function's packaged code. This must be a `.zip` file.
-* `IPV4SetNameSuffix`: Enter the name for the Wafv2 IPv6 set. Default is `IPv4Set`.
-* `IPV6SetNameSuffix`: Enter the name for the Wafv2 IPv6 set. Default is `IPv6Set`.
+* `IPV4SetNameSuffix`: Enter the name for the AWS WAF IPv6 set. Default is `IPv4Set`.
+* `IPV6SetNameSuffix`: Enter the name for the AWS WAF IPv6 set. Default is `IPv6Set`.
 * `SERVICES`: Enter the name of the AWS services to add, separated by commas and as explained in <https://docs.aws.amazon.com/general/latest/gr/aws-ip-ranges.html>. The default is `ROUTE53_HEALTHCHECKS,CLOUDFRONT`.
 * `EC2REGIONS`: For the "EC2" service only, specify the AWS regions to add, separated by commas. Use 'all' to add all AWS regions. Default is `all`.
 
@@ -122,7 +122,7 @@ If the stack creation fails, troubleshoot by reviewing the stack events. The typ
 
 ### 5a. Trigger a test Lambda invocation with the AWS CLI
 
-After the stack is created, the WAF IP sets are not updated until a new SNS message is received. To test the function and update the IP sets with the current IP ranges for the first time, do a test invocation with the AWS CLI command below:
+After the stack is created, the AWS WAF IP sets are not updated until a new SNS message is received. To test the function and update the IP sets with the current IP ranges for the first time, do a test invocation with the AWS CLI command below:
 
 ```bash
 aws lambda invoke \
@@ -179,7 +179,7 @@ See [Using an IP set in a rule group or Web ACL](https://docs.aws.amazon.com/waf
 Remove the temporary files.
 
 ```bash
-rm update_wafv2_ipset.py
+rm update_aws_waf_ipset.py
 rm $OBJECT_NAME
 rm lambda_return.json
 ```
@@ -191,10 +191,10 @@ After the stack is created, you can customize the Lambda function's execution by
 * `SERVICES`: **Optional**. Comma separated values for service's to get the ranges for. Value is set to `ROUTE53_HEALTHCHECKS,CLOUDFRONT` if it is not explicitly set.
 * `EC2_REGIONS`. **Optional**. Comma separated values for EC2 regions to be added to the IP set.
 * `INFO_LOGGING`: **Optional**. Set it to `true` for more detailed logging of the AWS Lambda Python script.
-* `IPV4_SET_NAME`: The WAFv2 IPv4 set name.
-* `IPV4_SET_ID`: The ID of the WAFv2 IPV4 set to update.
-* `IPV6_SET_NAME`: The WAFv2 IPv4 set name.
-* `IPV6_SET_ID`: The ID of the WAFv2 IPV6 set to update.
+* `IPV4_SET_NAME`: The AWS WAF IPv4 set name.
+* `IPV4_SET_ID`: The ID of the AWS WAF IPV4 set to update.
+* `IPV6_SET_NAME`: The AWS WAF IPv4 set name.
+* `IPV6_SET_ID`: The ID of the AWS WAF IPV6 set to update.
 
 ## Security
 
