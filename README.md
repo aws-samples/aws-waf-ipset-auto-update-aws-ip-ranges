@@ -93,7 +93,7 @@ The CloudFormation template has the following input parameters.
 
 * `LambdaCodeS3Bucket`: The S3 bucket where the Lambda function's packaged code is stored.
 * `LambdaCodeS3Object`: The S3 object name of Lambda function's packaged code. This must be a `.zip` file.
-* `IPV4SetNameSuffix`: Enter the name for the AWS WAF IPv6 set. Default is `IPv4Set`.
+* `IPV4SetNameSuffix`: Enter the name for the AWS WAF IPv4 set. Default is `IPv4Set`.
 * `IPV6SetNameSuffix`: Enter the name for the AWS WAF IPv6 set. Default is `IPv6Set`.
 * `SERVICES`: Enter the name of the AWS services to add, separated by commas and as explained in <https://docs.aws.amazon.com/general/latest/gr/aws-ip-ranges.html>. The default is `ROUTE53_HEALTHCHECKS,CLOUDFRONT`.
 * `EC2REGIONS`: For the "EC2" service only, specify the AWS regions to add, separated by commas. Use 'all' to add all AWS regions. Default is `all`.
@@ -129,6 +129,7 @@ aws lambda invoke \
   --function-name $CFN_STACK_NAME-UpdateWAFIPSets \
   --region $REGION \
   --payload file://lambda/test_event.json lambda_return.json
+  --cli-binary-format raw-in-base64-out
 ```
 
 After successful invocation, you should receive the response below with no errors.
