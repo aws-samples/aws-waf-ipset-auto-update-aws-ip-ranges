@@ -129,6 +129,7 @@ aws lambda invoke \
   --function-name $CFN_STACK_NAME-UpdateWAFIPSets \
   --region $REGION \
   --payload file://lambda/test_event.json lambda_return.json
+  --cli-binary-format raw-in-base64-out
 ```
 
 After successful invocation, you should receive the response below with no errors.
